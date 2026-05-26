@@ -1,0 +1,820 @@
+/* ============================================================
+   IMPORTACIÓN DE FUENTE
+   Inter desde Google Fonts, pesos 300–700.
+============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+
+/* ============================================================
+   VARIABLES GLOBALES
+   Paleta de colores, sombras, radios y fuente base.
+   Se usan en todo el documento mediante var(--nombre).
+============================================================ */
+:root {
+  /* Fondos */
+  --bg-base:       #f2f0f8;   /* fondo general de la página */
+  --bg-card:       #ffffff;   /* fondo de tarjetas y paneles */
+  --bg-input:      #f7f5fc;   /* fondo de zonas de controles */
+
+  /* Paleta morada principal */
+  --purple:        #6c4fd6;
+  --purple-light:  #ede9fb;
+  --purple-mid:    #9880e8;
+  --purple-dark:   #4a31a8;
+
+  /* Paleta roja (escenario I2 y estados de alerta) */
+  --red:           #c93f52;
+  --red-light:     #fdeef1;
+  --red-mid:       #e0768a;
+
+  /* Paleta rosa (escenario comparación y acentos) */
+  --pink:          #d4679a;
+  --pink-light:    #fce9f4;
+  --pink-mid:      #e49fc3;
+
+  /* Azul (escenario I3) */
+  --blue:          #2196c4;
+
+  /* Texto */
+  --text-primary:   #1c1430;   /* texto principal */
+  --text-secondary: #6b5f8a;   /* texto secundario */
+  --text-tertiary:  #a899c4;   /* texto de apoyo y etiquetas */
+
+  /* Bordes */
+  --border:         rgba(108, 79, 214, 0.10);  /* borde suave */
+  --border-mid:     rgba(108, 79, 214, 0.22);  /* borde medio */
+
+  /* Sombras */
+  --shadow-sm:  0 1px 4px rgba(80, 50, 180, 0.07), 0 2px 8px rgba(80, 50, 180, 0.05);
+  --shadow-md:  0 3px 12px rgba(80, 50, 180, 0.10), 0 1px 4px rgba(80, 50, 180, 0.06);
+  --shadow-lg:  0 6px 24px rgba(80, 50, 180, 0.13), 0 2px 8px rgba(80, 50, 180, 0.07);
+
+  /* Forma y tipografía */
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --font: 'Inter', system-ui, sans-serif;
+}
+
+
+/* ============================================================
+   RESET Y BASE
+============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  min-height: 100vh;
+  padding: 2rem 1.5rem;
+}
+
+/* Título principal de la página */
+.page-title {
+  max-width: 960px;
+  margin: 0.8rem auto 1.6rem;
+  text-align: center;
+  font-size: 2.9rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--purple-dark);
+  text-shadow: 0 3px 10px rgba(74, 49, 168, 0.22);
+}
+
+
+/* ============================================================
+   CONTENEDOR PRINCIPAL
+============================================================ */
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  font-family: var(--font);
+}
+
+
+/* ============================================================
+   BOTONES DE ESCENARIO DE ORIGEN (I1 / I2 / I3)
+============================================================ */
+.scenario-btns {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 0.7rem;
+}
+
+.sbtn {
+  flex: 1;
+  padding: 9px 6px;
+  font-size: 12px;
+  font-family: var(--font);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.18s ease;
+}
+
+.sbtn:hover:not(.active) {
+  border-color: var(--purple-mid);
+  color: var(--purple);
+  box-shadow: var(--shadow-md);
+  background: var(--purple-light);
+}
+
+.sbtn.active {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* I1 activo: morado */
+.sbtn[data-scenario="I1"].active {
+  border-color: var(--purple);
+  background: var(--purple);
+  box-shadow: 0 3px 14px rgba(108, 79, 214, 0.30), 0 1px 4px rgba(108, 79, 214, 0.18);
+}
+
+/* I2 activo: rojo */
+.sbtn[data-scenario="I2"].active {
+  border-color: var(--red);
+  background: var(--red);
+  box-shadow: 0 3px 14px rgba(201, 63, 82, 0.30), 0 1px 4px rgba(201, 63, 82, 0.18);
+}
+
+/* I3 activo: azul */
+.sbtn[data-scenario="I3"].active {
+  border-color: var(--blue);
+  background: var(--blue);
+  box-shadow: 0 3px 14px rgba(33, 150, 196, 0.35), 0 1px 4px rgba(33, 150, 196, 0.20);
+}
+
+
+/* ============================================================
+   TARJETAS DE MÉTRICAS RESUMEN (parte superior)
+============================================================ */
+.top-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.metric {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.1rem;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+/* Franja de color en la parte superior de cada tarjeta */
+.metric::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--purple), var(--pink), var(--red));
+}
+
+.metric:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
+}
+
+.metric-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+}
+
+.metric-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--purple);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.metric-sub {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+
+/* ============================================================
+   REJILLA DE DOS COLUMNAS (parámetros + mitigaciones)
+============================================================ */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Estilo compartido por ambas columnas */
+.two-col > div {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.1rem 1.2rem;
+  box-shadow: var(--shadow-md);
+}
+
+/* La columna de parámetros distribuye sus hijos verticalmente */
+.two-col > div:first-child {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+
+/* ============================================================
+   TÍTULOS DE SECCIÓN
+============================================================ */
+.ctrl-title,
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--purple);
+  margin-bottom: 1rem;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+
+/* ============================================================
+   FILAS DE PARÁMETROS (label + slider + valor)
+============================================================ */
+.ctrl-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0;
+  min-height: 2.25rem;
+  position: relative;
+}
+
+/* Etiqueta del parámetro */
+.ctrl-row label {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  width: 108px;
+  flex-shrink: 0;
+}
+
+/* Tooltip que aparece al hacer hover sobre la fila.
+   El texto se toma del atributo data-tip del HTML. */
+.ctrl-row::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  width: min(290px, 92%);
+  padding: 0.5rem 0.65rem;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--text-primary);
+  background: #fff;
+  border: 1px solid rgba(108, 79, 214, 0.14);
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(35, 20, 75, 0.16);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  z-index: 10;
+}
+
+.ctrl-row:hover::after,
+.ctrl-row:focus-within::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Valor numérico actual del slider */
+.ctrl-row .val {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--purple-dark);
+  width: 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Contenedor del slider + marca de referencia */
+.range-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.range-wrap input[type=range] {
+  width: 100%;
+  position: relative;
+  z-index: 2;
+}
+
+/* Punto que marca la posición del valor canónico del modelo.
+   Su posición (left: X%) se calcula en el HTML para cada parámetro. */
+.range-ref {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--purple);
+  border: none;
+  box-shadow: 0 0 0 1px rgba(108, 79, 214, 0.35);
+  pointer-events: none;
+  z-index: 1;
+}
+
+
+/* ============================================================
+   SLIDER (input[type=range])
+   Estilos para webkit (Chrome, Safari) y moz (Firefox).
+   El slider desactivado (pS3, solo lectura) usa los mismos
+   estilos visuales para mantener coherencia.
+============================================================ */
+.ctrl-row input[type=range] {
+  flex: 1;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  height: 14px;
+  background: transparent;
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+  opacity: 1;
+  transition: filter 0.15s, opacity 0.15s;
+}
+
+.ctrl-row input[type=range]:hover,
+.ctrl-row input[type=range]:focus {
+  filter: brightness(1.02);
+}
+
+/* Pista del slider (webkit) */
+.ctrl-row input[type=range]::-webkit-slider-runnable-track,
+.ctrl-row input[type=range]:disabled::-webkit-slider-runnable-track {
+  height: 3px;
+  background: linear-gradient(90deg, var(--purple-mid), var(--pink-mid));
+  border-radius: 999px;
+  border: none;
+}
+
+/* Pulgar del slider (webkit) */
+.ctrl-row input[type=range]::-webkit-slider-thumb,
+.ctrl-row input[type=range]:disabled::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--purple);
+  box-shadow: 0 1px 6px rgba(108, 79, 214, 0.35);
+  cursor: pointer;
+  border: 2px solid #fff;
+  transition: box-shadow 0.15s, transform 0.15s;
+  margin-top: -5.5px;
+}
+
+.ctrl-row input[type=range]:hover::-webkit-slider-thumb {
+  box-shadow: 0 2px 10px rgba(108, 79, 214, 0.45);
+  transform: scale(1.15);
+}
+
+/* Pista del slider (Firefox) */
+.ctrl-row input[type=range]::-moz-range-track,
+.ctrl-row input[type=range]:disabled::-moz-range-track {
+  height: 3px;
+  background: linear-gradient(90deg, var(--purple-mid), var(--pink-mid));
+  border: none;
+  border-radius: 999px;
+}
+
+/* Pulgar del slider (Firefox) */
+.ctrl-row input[type=range]::-moz-range-thumb,
+.ctrl-row input[type=range]:disabled::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--purple);
+  box-shadow: 0 1px 6px rgba(108, 79, 214, 0.35);
+  cursor: pointer;
+  border: 2px solid #fff;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+/* Slider desactivado: mantiene apariencia visual pero sin cursor de puntero */
+.ctrl-row input[type=range]:disabled {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  cursor: default;
+  filter: none;
+  opacity: 1;
+}
+
+
+/* ============================================================
+   FILAS DE MITIGACIÓN (checkbox + etiqueta + badge)
+============================================================ */
+.mitigation-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0.62rem 0.82rem;
+  background: linear-gradient(180deg, #fbfaff 0%, #f7f5fc 100%);
+  border: 1px solid rgba(108, 79, 214, 0.13);
+  border-radius: 11px;
+  margin-bottom: 7px;
+  transition: border-color 0.16s, background 0.16s, box-shadow 0.16s, transform 0.16s;
+  cursor: pointer;
+}
+
+.mitigation-row:hover {
+  border-color: rgba(108, 79, 214, 0.28);
+  background: linear-gradient(180deg, #f5f0ff 0%, #efe8ff 100%);
+  box-shadow: 0 6px 16px rgba(92, 63, 190, 0.12);
+  transform: translateY(-1px);
+}
+
+/* Fila con checkbox marcado */
+.mitigation-row:has(input:checked) {
+  border-color: rgba(180, 104, 184, 0.38);
+  background: linear-gradient(180deg, #fdf5ff 0%, #f7ecfb 100%);
+  box-shadow: 0 7px 18px rgba(169, 88, 172, 0.16);
+}
+
+.mitigation-row label {
+  font-size: 12.3px;
+  color: var(--text-secondary);
+  flex: 1;
+  cursor: pointer;
+  transition: color 0.15s, font-weight 0.15s;
+  line-height: 1.32;
+}
+
+.mitigation-row:has(input:checked) label {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.mitigation-row input[type=checkbox] {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+  accent-color: #b25bc1;
+  border-radius: 4px;
+}
+
+
+/* ============================================================
+   BADGES DE ACTOR (plataforma / institución / usuarios)
+============================================================ */
+.mit-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 9px;
+  border-radius: 20px;
+  border: 1px solid;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.mit-plat  { background: #eee8ff; color: #4f36ad; border-color: rgba(108, 79, 214, 0.28); }
+.mit-inst  { background: #ffecef; color: #b13448; border-color: rgba(201, 63, 82, 0.30); }
+.mit-users { background: #fbeafa; color: #b34b85; border-color: rgba(212, 103, 154, 0.30); }
+
+
+/* ============================================================
+   LEYENDA DE CURVAS
+============================================================ */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 0.85rem;
+}
+
+.leg-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.leg-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+
+/* ============================================================
+   ÁREA DE LA GRÁFICA
+============================================================ */
+.chart-area {
+  position: relative;
+  width: 100%;
+  height: 420px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  box-shadow: var(--shadow-lg);
+}
+
+
+/* ============================================================
+   ACCESIBILIDAD
+============================================================ */
+/* Oculta visualmente un elemento pero lo mantiene accesible
+   para lectores de pantalla */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+}
+
+
+/* ============================================================
+   PANEL SELECTOR DE ESCENARIO Y CURVAS
+============================================================ */
+.selector-panel {
+  width: 100%;
+  margin: 0 0 1.5rem;
+  padding: 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+/* Rejilla de tres columnas: susceptibles, infectados, recuperados */
+.selector-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+/* Cada grupo de curvas (susceptibles / infectados / recuperados) */
+.selector-group {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Grupo de escenario (fila superior, fuera del selector-grid) */
+.selector-panel > .selector-group {
+  margin-bottom: 0.9rem;
+}
+
+.selector-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.selector-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.selector-btns-total {
+  margin-top: 0.55rem;
+}
+
+/* Columnas Ra / Rb dentro del grupo de recuperados */
+.rec-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.rec-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Botones de subtotales Ra/Rb ocupan el ancho completo */
+.rec-main-btn { width: 100%; }
+
+/* Botones individuales de Ra/Rb apilados verticalmente */
+.rec-sub-btns {
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rec-sub-btns .cbtn { width: 100%; }
+
+
+/* ============================================================
+   BOTONES DE CURVA (cbtn)
+   Botones toggle para activar/desactivar curvas en la gráfica.
+   Los colores activos se inyectan mediante variables CSS inline
+   desde el HTML (--active-bg, --active-border, --active-color).
+============================================================ */
+.cbtn {
+  flex: 1;
+  min-height: 34px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.18s ease;
+}
+
+.cbtn:hover {
+  border-color: var(--purple-mid);
+  color: var(--purple);
+  background: var(--purple-light);
+}
+
+
+/* ============================================================
+   COMPARADOR DE DOS PUNTOS
+   Barra con el botón de activación, texto de instrucción
+   y panel con las dos tarjetas de resultados.
+============================================================ */
+
+/* Barra con el botón y el texto guía */
+.compare-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+/* Botón principal: estado inactivo (morado) */
+.compare-bar button {
+  padding: 0.45rem 1.1rem;
+  font-size: 0.85rem;
+  font-family: var(--font);
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-mid);
+  background: var(--bg-card);
+  color: var(--purple);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+
+.compare-bar button:hover {
+  background: rgba(108, 79, 214, 0.08);
+}
+
+/* Botón en modo comparación activo: cambia a rojo para indicar
+   que hacer clic lo cancela */
+.compare-bar button.compare-active {
+  background: rgba(201, 63, 82, 0.08);
+  border-color: rgba(201, 63, 82, 0.4);
+  color: var(--red);
+}
+
+/* Texto de instrucción al usuario ("haz clic para seleccionar...") */
+.compare-hint {
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* Panel que contiene las dos tarjetas lado a lado */
+.compare-panel {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Cada tarjeta de punto (Punto 1 / Punto 2) */
+.cmp-card {
+  flex: 1;
+  min-width: 220px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.2rem;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.cmp-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
+}
+
+.cmp-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--purple), var(--pink), var(--red));
+}
+
+/* Encabezado de la tarjeta: "Punto 1 — día X" */
+.cmp-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--purple);
+  margin: 0 0 0.75rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Fila de cada curva dentro de la tarjeta:
+   punto de color + etiqueta + valor numérico */
+.cmp-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+  font-size: 0.82rem;
+}
+
+/* Círculo de color que identifica la curva */
+.cmp-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Icono de línea discontinua para las filas "(sin mitigación)".
+   Imita visualmente el patrón de guion de la gráfica. */
+.cmp-dash {
+  width: 14px;
+  height: 3px;
+  border-radius: 1px;
+  flex-shrink: 0;
+  opacity: 0.7;
+  /* Simula el patrón discontinuo con un degradado */
+  background: repeating-linear-gradient(
+    90deg,
+    currentColor 0px, currentColor 4px,
+    transparent 4px, transparent 7px
+  );
+}
+
+/* Nombre de la curva */
+.cmp-label {
+  flex: 1;
+  color: var(--text-tertiary);
+}
+
+/* Valor numérico formateado con separador de miles */
+.cmp-val {
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+
+/* ============================================================
+   RESPONSIVE
+   En pantallas estrechas el selector de curvas y las columnas
+   Ra/Rb pasan a una sola columna.
+============================================================ */
+@media (max-width: 900px) {
+  .selector-grid { grid-template-columns: 1fr; }
+  .rec-cols      { grid-template-columns: 1fr; }
+}

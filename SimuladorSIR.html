@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador SIR heterogéneo</title>
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+
+<!-- Título oculto visualmente pero accesible para lectores de pantalla -->
+<h2 class="sr-only">Simulador interactivo del modelo SIR heterogéneo de propagación de fake news</h2>
+<h1 class="page-title">Modelo SIR heterogéneo</h1>
+
+<div class="container">
+
+  <!-- ============================================================
+       MÉTRICAS RESUMEN
+       Se calculan en update() tras cada simulación y se inyectan
+       mediante textContent en los elementos con id m-peak, m-final
+       y m-extinct.
+  ============================================================ -->
+  <div class="top-grid">
+    <div class="metric">
+      <p class="metric-label">Infectados pico</p>
+      <p class="metric-value" id="m-peak">—</p>
+      <p class="metric-sub" id="m-peak-day">día —</p>
+    </div>
+    <div class="metric">
+      <p class="metric-label">Alcance final (90 días)</p>
+      <p class="metric-value" id="m-final">—</p>
+      <p class="metric-sub">% de la población</p>
+    </div>
+    <div class="metric">
+      <p class="metric-label">Días hasta extinción</p>
+      <p class="metric-value" id="m-extinct">—</p>
+      <p class="metric-sub">I &lt; 0.1% de N</p>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       PANEL DE PARÁMETROS Y MITIGACIONES
+       Dos columnas: sliders del modelo (izquierda) y checkboxes
+       de mitigación (derecha). Cualquier cambio llama a update().
+  ============================================================ -->
+  <div class="two-col">
+
+    <!-- Columna izquierda: parámetros del modelo -->
+    <div>
+      <div class="ctrl-title">Parámetros del modelo</div>
+
+      <!-- Factor de escala C: multiplica globalmente la matriz β_base.
+           Rango [10, 40], valor de referencia 25 (marca al 50% del rango). -->
+      <div class="ctrl-row" data-tip="Multiplica globalmente la intensidad de contagio del modelo.">
+        <label>Factor escala C</label>
+        <div class="range-wrap">
+          <input type="range" id="C" min="10" max="40" step="1" value="25" oninput="update()">
+          <span class="range-ref" style="left:50%;" title="Punto de referencia"></span>
+        </div>
+        <span class="val" id="C-v">25</span>
+      </div>
+
+      <!-- Tasas de recuperación γ por tipo de infectado.
+           γ₁ > γ₂ > γ₃, reflejando que los propagadores (I1) se
+           desenganchan más rápido que los catalizadores (I3).
+           Las marcas de referencia se calculan como:
+             left = (valor_ref - min) / (max - min) × 100% -->
+      <div class="ctrl-row" data-tip="Velocidad de recuperación del grupo I1 (propagadores).">
+        <label>γ₁ (propagadores)</label>
+        <div class="range-wrap">
+          <input type="range" id="g1" min="0.1" max="0.8" step="0.01" value="0.40" oninput="update()">
+          <span class="range-ref" style="left:42.86%;" title="Punto de referencia"></span>
+        </div>
+        <span class="val" id="g1-v">0.40</span>
+      </div>
+      
+      <div class="ctrl-row" data-tip="Velocidad de recuperación del grupo I2 (amplificadores).">
+        <label>γ₂ (amplificadores)</label>
+        <div class="range-wrap">
+          <input type="range" id="g2" min="0.05" max="0.5" step="0.01" value="0.15" oninput="update()">
+          <span class="range-ref" style="left:22.22%;" title="Punto de referencia"></span>
+        </div>
+        <span class="val" id="g2-v">0.15</span>
+      </div>
+
+      <div class="ctrl-row" data-tip="Velocidad de recuperación del grupo I3 (catalizadores).">
+        <label>γ₃ (catalizadores)</label>
+        <div class="range-wrap">
+          <input type="range" id="g3" min="0.01" max="0.2" step="0.005" value="0.05" oninput="update()">
+          <span class="range-ref" style="left:21.05%;" title="Punto de referencia"></span>
+        </div>
+        <span class="val" id="g3-v">0.05</span>
+      </div>
+
+      <!-- Distribución de susceptibles (pS1 + pS2 + pS3 = 100% siempre).
+           S1 y S2 son ajustables; S3 es de solo lectura y se recalcula
+           automáticamente en onInputSusceptible() como 100 - pS1 - pS2.
+           Si mover S1 o S2 haría que S3 < 0, el slider se bloquea en
+           el valor máximo permitido. -->
+      <div class="ctrl-row" data-tip="Porcentaje del subgrupo S1 (baja susceptibilidad) en la población total.">
+        <label>% S1 en población</label>
+        <div class="range-wrap">
+          <input type="range" id="pS1" min="1" max="98" step="1" value="28" oninput="onInputSusceptible('pS1')">
+          <span class="range-ref" style="left:27.84%;" title="Punto de referencia"></span>
+        </div>
+        <span class="val" id="pS1-v">28%</span>
+      </div>
+
+      <div class="ctrl-row" data-tip="Porcentaje del subgrupo S2 (media susceptibilidad) en la población total.">
+        <label>% S2 en población</label>
+        <div class="range-wrap">
+          <input type="range" id="pS2" min="1" max="98" step="1" value="42" oninput="onInputSusceptible('pS2')">
+          <span class="range-ref" style="left:42.27%;" title="Punto de referencia"></span>
+        </div>
+        <span class="val" id="pS2-v">42%</span>
+      </div>
+      
+      <!-- S3: solo lectura. Su valor siempre es 100 - pS1 - pS2.
+           El atributo disabled impide que el usuario lo arrastre. -->
+      <div class="ctrl-row" data-tip="Porcentaje del subgrupo S3 (alta susceptibilidad). Se calcula automáticamente como 100 − S1 − S2.">
+        <label>% S3 en población</label>
+        <div class="range-wrap">
+          <input type="range" id="pS3" min="0" max="98" step="1" value="30" disabled>
+          <span class="range-ref" style="left:30.61%;" title="Punto de referencia"></span>
+        </div>
+        <span class="val" id="pS3-v">30%</span>
+      </div>
+
+      <!-- Tamaño total de la población N. Sin marca de referencia
+           porque el valor por defecto (1M) es solo orientativo. -->
+      <div class="ctrl-row" data-tip="Tamaño total de la población simulada.">
+        <label>Población N</label>
+        <div class="range-wrap">
+          <input type="range" id="N" min="50000" max="5000000" step="50000" value="1000000" oninput="update()">
+        </div>
+        <span class="val" id="N-v">1M</span>
+      </div>
+    </div>
+
+    <!-- Columna derecha: técnicas de mitigación.
+         Cada checkbox activa modificadores sobre β y/o γ en
+         makeBeta(), getGammas() y el bucle de simulate(). -->
+    <div>
+      <div class="section-title">Técnicas de mitigación</div>
+
+      <!-- m1: suspensión/shadowban de I3 → reduce fila i=2 al 5% y aumenta γ₃ ×4 -->
+      <div class="mitigation-row">
+        <input type="checkbox" id="m1" onchange="update()">
+        <label for="m1">Suspensión/shadowban de I3</label>
+        <span class="mit-badge mit-plat">plataforma</span>
+      </div>
+      <!-- m2: reducción algorítmica del alcance de I2 → reduce fila i=1 al 70% -->
+      <div class="mitigation-row">
+        <input type="checkbox" id="m2" onchange="update()">
+        <label for="m2">Reducción alcance algorítmico I2</label>
+        <span class="mit-badge mit-plat">plataforma</span>
+      </div>
+      <!-- m3: etiquetado de contenido disputado → reduce β globalmente un 25% -->
+      <div class="mitigation-row">
+        <input type="checkbox" id="m3" onchange="update()">
+        <label for="m3">Etiquetado de contenido disputado</label>
+        <span class="mit-badge mit-plat">plataforma</span>
+      </div>
+      <!-- m4: fricción al compartir → reduce β globalmente un 15% -->
+      <div class="mitigation-row">
+        <input type="checkbox" id="m4" onchange="update()">
+        <label for="m4">Fricción al compartir (global)</label>
+        <span class="mit-badge mit-plat">plataforma</span>
+      </div>
+      <!-- m5: campaña de alfabetización digital dirigida a S3 → reduce columna j=2 al 65% -->
+      <div class="mitigation-row">
+        <input type="checkbox" id="m5" onchange="update()">
+        <label for="m5">Campaña alfabetización digital S3</label>
+        <span class="mit-badge mit-inst">institución</span>
+      </div>
+      <!-- m6: corrección entre pares → reduce β globalmente un 15% -->
+      <div class="mitigation-row">
+        <input type="checkbox" id="m6" onchange="update()">
+        <label for="m6">Corrección entre pares</label>
+        <span class="mit-badge mit-users">usuarios</span>
+      </div>
+      <!-- m7: denuncia de contenido falso → reduce β dinámicamente según R_total acumulado -->
+      <div class="mitigation-row">
+        <input type="checkbox" id="m7" onchange="update()">
+        <label for="m7">Denuncia contenido falso</label>
+        <span class="mit-badge mit-users">usuarios</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       SELECTOR DE ESCENARIO Y CURVAS
+       - Escenario: fija el compartimento de origen del brote (I1/I2/I3).
+       - Curvas: activa/desactiva qué series se representan en la gráfica.
+  ============================================================ -->
+  <div class="selector-panel">
+
+    <!-- Botones de escenario de origen -->
+    <div class="selector-group">
+      <p class="selector-label">Origen</p>
+      <div class="scenario-btns">
+        <button class="sbtn active" data-scenario="I1" onclick="setScenario('I1')">Origen I1 · Propagador</button>
+        <button class="sbtn" data-scenario="I2" onclick="setScenario('I2')">Origen I2 · Amplificador</button>
+        <button class="sbtn" data-scenario="I3" onclick="setScenario('I3')">Origen I3 · Catalizador</button>
+      </div>
+    </div>
+
+    <!-- Botones de selección de curvas, organizados por compartimento.
+         Los colores activos se inyectan mediante variables CSS inline. -->
+    <div class="selector-grid">
+
+      <!-- Susceptibles: S1, S2, S3 y total -->
+      <div class="selector-group">
+        <p class="selector-label">Susceptibles</p>
+        <div class="selector-btns">
+          <button class="cbtn" data-curve="S1" onclick="toggleCurve('S1')" style="--active-bg:#c9c0e8;--active-border:#9b8fd4;--active-color:#3C3489;">S1</button>
+          <button class="cbtn" data-curve="S2" onclick="toggleCurve('S2')" style="--active-bg:#f0b8c0;--active-border:#c9606e;--active-color:#7a1c28;">S2</button>
+          <button class="cbtn" data-curve="S3" onclick="toggleCurve('S3')" style="--active-bg:#a8cfe8;--active-border:#378ADD;--active-color:#0C447C;">S3</button>
+        </div>
+        <div class="selector-btns selector-btns-total">
+          <button class="cbtn" data-curve="ST" onclick="toggleCurve('ST')" style="--active-bg:#FFF4BF;--active-border:#E6D48A;--active-color:#5A4700;">Total S</button>
+        </div>
+      </div>
+
+      <!-- Infectados: I1, I2, I3 y total -->
+      <div class="selector-group">
+        <p class="selector-label">Infectados</p>
+        <div class="selector-btns">
+          <button class="cbtn" data-curve="I1" onclick="toggleCurve('I1')" style="--active-bg:#6c4fd6;--active-border:#4a32a0;--active-color:#fff;">I1</button>
+          <button class="cbtn" data-curve="I2" onclick="toggleCurve('I2')" style="--active-bg:#c93f52;--active-border:#8f1f2f;--active-color:#fff;">I2</button>
+          <button class="cbtn" data-curve="I3" onclick="toggleCurve('I3')" style="--active-bg:#2196c4;--active-border:#0f6080;--active-color:#fff;">I3</button>
+        </div>
+        <div class="selector-btns selector-btns-total">
+          <button class="cbtn" data-curve="IT" onclick="toggleCurve('IT')" style="--active-bg:#E8B500;--active-border:#B68D00;--active-color:#3B2B00;">Total I</button>
+        </div>
+      </div>
+
+      <!-- Recuperados: Ra (permanente) y Rb (temporal) por grupo, más totales -->
+      <div class="selector-group">
+        <p class="selector-label">Recuperados</p>
+        <div class="rec-cols">
+          <div class="rec-col">
+            <div class="selector-btns rec-sub-btns">
+              <button class="cbtn" data-curve="Ra1" onclick="toggleCurve('Ra1')" style="--active-bg:#F08CB4;--active-border:#CC5F8F;--active-color:#fff;">Ra1</button>
+              <button class="cbtn" data-curve="Ra2" onclick="toggleCurve('Ra2')" style="--active-bg:#7FD67D;--active-border:#58B357;--active-color:#fff;">Ra2</button>
+              <button class="cbtn" data-curve="Ra3" onclick="toggleCurve('Ra3')" style="--active-bg:#FFB067;--active-border:#E08F47;--active-color:#fff;">Ra3</button>
+            </div>
+            <div class="selector-btns selector-btns-total">
+              <button class="cbtn rec-main-btn" data-curve="RaT" onclick="toggleCurve('RaT')" style="--active-bg:#FFD84D;--active-border:#D1AA0F;--active-color:#4A3400;">Total Ra</button>
+            </div>
+          </div>
+          <div class="rec-col">
+            <div class="selector-btns rec-sub-btns">
+              <button class="cbtn" data-curve="Rb1" onclick="toggleCurve('Rb1')" style="--active-bg:#D86496;--active-border:#AD4676;--active-color:#fff;">Rb1</button>
+              <button class="cbtn" data-curve="Rb2" onclick="toggleCurve('Rb2')" style="--active-bg:#3F9C45;--active-border:#2D7832;--active-color:#fff;">Rb2</button>
+              <button class="cbtn" data-curve="Rb3" onclick="toggleCurve('Rb3')" style="--active-bg:#FF7A00;--active-border:#CC6200;--active-color:#fff;">Rb3</button>
+            </div>
+            <div class="selector-btns selector-btns-total">
+              <button class="cbtn rec-main-btn" data-curve="RbT" onclick="toggleCurve('RbT')" style="--active-bg:#FFB000;--active-border:#C88600;--active-color:#3F2D00;">Total Rb</button>
+            </div>
+          </div>
+        </div>
+        <div class="selector-btns selector-btns-total">
+          <button class="cbtn" data-curve="RT" onclick="toggleCurve('RT')" style="--active-bg:#CC8400;--active-border:#9C6400;--active-color:#fff;">Total R</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leyenda generada dinámicamente en update() -->
+  <div class="legend" id="legend"></div>
+
+  <!-- Canvas donde Chart.js dibuja las series temporales -->
+  <div class="chart-area">
+    <canvas id="chart" role="img" aria-label="Gráfica de evolución de compartimentos del modelo SIR heterogéneo"></canvas>
+  </div>
+
+  <!-- ============================================================
+       COMPARADOR DE DOS PUNTOS
+       Al activar el modo comparación, el usuario hace clic dos veces
+       en la gráfica. Cada clic recoge el día y los valores de todas
+       las curvas activas en ese instante, igual que el tooltip.
+       Los resultados se muestran en dos tarjetas fijas lado a lado.
+  ============================================================ -->
+  <div class="compare-bar">
+    <button id="compare-btn" onclick="toggleCompareMode()">Comparar dos puntos</button>
+    <span id="compare-hint" class="compare-hint"></span>
+  </div>
+  <!-- El panel permanece oculto hasta que se seleccionan los dos puntos -->
+  <div id="compare-panel" class="compare-panel" style="display:none;"></div>
+
+</div><!-- fin .container -->
+
+
+<!-- Chart.js: librería de gráficas cargada desde CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<script>
+/* ================================================================
+   METADATOS DE CURVAS
+   Etiqueta y color de cada serie representable en la gráfica.
+   Se usa para construir los datasets de Chart.js y la leyenda.
+================================================================ */
+const CURVE_META = {
+  S1:  { label: 'S1 baja susceptibilidad',  color: '#c9c0e8' },
+  S2:  { label: 'S2 media susceptibilidad', color: '#f0b8c0' },
+  S3:  { label: 'S3 alta susceptibilidad',  color: '#a8cfe8' },
+  I1:  { label: 'I1 propagadores',          color: '#6c4fd6' },
+  I2:  { label: 'I2 amplificadores',        color: '#c93f52' },
+  I3:  { label: 'I3 catalizadores',         color: '#2196c4' },
+  ST:  { label: 'Total susceptibles',       color: '#FFF4BF' },
+  IT:  { label: 'Total infectados',         color: '#E8B500' },
+  Ra1: { label: 'Ra1 permanente (grupo 1)', color: '#F08CB4' },
+  Ra2: { label: 'Ra2 permanente (grupo 2)', color: '#7FD67D' },
+  Ra3: { label: 'Ra3 permanente (grupo 3)', color: '#FFB067' },
+  Rb1: { label: 'Rb1 temporal (grupo 1)',   color: '#D86496' },
+  Rb2: { label: 'Rb2 temporal (grupo 2)',   color: '#3F9C45' },
+  Rb3: { label: 'Rb3 temporal (grupo 3)',   color: '#FF7A00' },
+  RaT: { label: 'Total Ra (permanente)',    color: '#FFD84D' },
+  RbT: { label: 'Total Rb (temporal)',      color: '#FFB000' },
+  RT:  { label: 'Total recuperados',        color: '#CC8400' },
+};
+
+/* Orden canónico de todas las curvas (define el orden en leyenda y datasets) */
+const ALL_CURVES = ['S1','S2','S3','ST','I1','I2','I3','IT','Ra1','Ra2','Ra3','Rb1','Rb2','Rb3','RaT','RbT','RT'];
+
+/* Curvas activas en la gráfica (Set mutable). Por defecto: I1, I2, I3. */
+let activeCurves = new Set(['I1','I2','I3']);
+
+/* Escenario de origen del brote: 'I1', 'I2' o 'I3'. */
+let activeScenario = 'I1';
+
+
+/* ================================================================
+   MATRIZ β BASE
+   Valores de transmisión calculados con la fórmula 30/70:
+     β_ij = 0.30·β_base_i + 0.70·β_base_j
+   B_base[i][j]: tasa base del infectado tipo i hacia el susceptible j.
+     i → fila:    0 = propagadores (I1), 1 = amplificadores (I2), 2 = catalizadores (I3)
+     j → columna: 0 = S1,              1 = S2,                   2 = S3
+   Valores más altos en j=2 (S3) reflejan su mayor susceptibilidad.
+   Se multiplican por C antes de usarse en la simulación.
+================================================================ */
+const B_base = [
+  [0.0095, 0.0249, 0.0411],
+  [0.0128, 0.0338, 0.0558],
+  [0.0160, 0.0421, 0.0695],
+];
+
+
+/* ================================================================
+   makeBeta(C, mitigations)
+   Construye la matriz β efectiva aplicando las mitigaciones activas
+   sobre B_base y escalando por C.
+   Orden de operaciones: mitigaciones primero, escala C al final.
+
+   Parámetros:
+     C           – factor de escala global [10, 40]
+     mitigations – objeto {m1..m7} con booleanos
+
+   Retorna: matriz 3×3 con los β_ij listos para la simulación.
+================================================================ */
+function makeBeta(C, mitigations) {
+  /* Copia de B_base para no mutar el original */
+  let B = B_base.map(r => [...r]);
+  const { m1, m2, m3, m4, m5, m6 } = mitigations;
+
+  /* m1: suspensión/shadowban de I3.
+     Reduce a un 5% la fila i=2 (I3 como emisor: casi no propaga).
+     Respaldo: Baribi-Bartov et al. (2024, Science) — suspender supersharers
+     elimina el 66.82% de las fake news compartidas en los meses siguientes. */
+  if (m1) {
+    for (let j = 0; j < 3; j++) B[2][j] *= 0.05;
+  }
+
+  /* m2: reducción del alcance algorítmico de I2.
+     Reduce al 70% la fila i=1 (I2 como emisor: reducción del 30% de alcance).
+     Respaldo: Vincent et al. (2022, HKS Misinfo Review) — downranking de grupos
+     reincidentes reduce el engagement por publicación un 16-31%. */
+  if (m2) { for (let j = 0; j < 3; j++) B[1][j] *= 0.70; }
+
+  /* m3: etiquetado de contenido disputado.
+     Reducción global del 25% sobre toda la matriz.
+     Respaldo: Pennycook et al. (metaanálisis, 21 exp., N=14.133) — las etiquetas
+     de fact-checkers reducen la intención de compartir fake news un 24.7%. */
+  if (m3) { for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) B[i][j] *= 0.75; }
+
+  /* m4: fricción al compartir.
+     Reducción global del 15% sobre toda la matriz.
+     Respaldo: Pennycook et al. (2022, Nature Comms) — accuracy prompts reducen
+     la intención de compartir fake news un 10%; rango de fricción: 10-20%. */
+  if (m4) { for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) B[i][j] *= 0.85; }
+
+  /* m5: campaña de alfabetización digital dirigida a S3.
+     Reduce al 65% la columna j=2 (S3 más resistente como receptor; reducción 35%).
+     Respaldo: Moore & Hancock (2022, Scientific Reports) — intervención de 1h
+     mejora la discriminación de fake news en adultos mayores en ~33 puntos. */
+  if (m5) { for (let i = 0; i < 3; i++) B[i][2] *= 0.65; }
+
+  /* m6: corrección entre pares.
+     Reducción global del 15% sobre toda la matriz.
+     Respaldo: Votta et al. (2024, Comms Psychology) — las correcciones de usuarios
+     ordinarios reducen la precisión percibida y el engagement con publicaciones
+     falsas en tres experimentos preregistrados (N~6.600). */
+  if (m6) { for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) B[i][j] *= 0.85; }
+
+  /* Escala global por C (aplicada siempre, al final) */
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) B[i][j] *= C;
+
+  return B;
+}
+
+
+/* ================================================================
+   getGammas(mitigations)
+   Devuelve el vector [γ₁, γ₂, γ₃] ajustado según las mitigaciones.
+   Los valores base se leen directamente de los sliders.
+
+   Solo m1 modifica γ: los nodos suspendidos dejan de propagar
+   activamente, lo que equivale a una recuperación forzada de I3.
+   El resto de mitigaciones actúan exclusivamente sobre β.
+
+   Parámetros:
+     mitigations – objeto {m1..m7} con booleanos
+
+   Retorna: array [γ₁, γ₂, γ₃] con valores ajustados.
+================================================================ */
+function getGammas(mitigations) {
+  /* Valores base leídos de los sliders */
+  let g = [
+    parseFloat(document.getElementById('g1').value),
+    parseFloat(document.getElementById('g2').value),
+    parseFloat(document.getElementById('g3').value)
+  ];
+
+  /* m1: I3 suspendido → γ₃ se cuadruplica (recuperación forzada), techo 0.9.
+     Los nodos suspendidos dejan de emitir activamente: su período infeccioso
+     efectivo se acorta drásticamente. Parámetro de modelado sin valor empírico
+     directo; el ×4 es una estimación razonada y conservadora. */
+  if (mitigations.m1) { g[2] = Math.min(g[2] * 4, 0.9); }
+
+  return g;
+}
+
+
+/* ================================================================
+   simulate(C, mitigations, pS1_pct, pS2_pct, pS3_pct, N)
+   Núcleo del simulador. Integra numéricamente las 12 EDOs del modelo
+   mediante el método de Euler explícito con paso dt=0.5 días,
+   durante un horizonte T=90 días (180 pasos).
+
+   Compartimentos: S[k], I[k], Ra[k], Rb[k] para k=0,1,2.
+
+   Parámetros:
+     C        – factor de escala
+     mitigations – objeto {m1..m7}
+     pS1_pct  – porcentaje de S1 en la población
+     pS2_pct  – porcentaje de S2 en la población
+     pS3_pct  – porcentaje de S3 en la población (= 100 - pS1 - pS2)
+     N        – tamaño total de la población
+
+   Retorna: objeto con arrays de 90 puntos (uno por día) para
+            cada compartimento y la serie temporal de días.
+================================================================ */
+function simulate(C, mitigations, pS1_pct, pS2_pct, pS3_pct, N) {
+  const T = 90, dt = 0.5;
+  const steps = Math.floor(T / dt); // 180 pasos de integración
+
+  /* Proporciones iniciales de susceptibles, leídas directamente
+     de los sliders (pS1 + pS2 + pS3 = 1 garantizado por onInputSusceptible). */
+  const pS1 = pS1_pct / 100;
+  const pS2 = pS2_pct / 100;
+  const pS3 = pS3_pct / 100;
+
+  /* Fracción de recuperados que pasan a Ra (permanente) por grupo.
+     El complemento (1 - pk[k]) pasa a Rb (temporal). */
+  const pk = [0.35, 0.25, 0.15];
+
+  /* Condiciones iniciales: todos en S salvo 1 infectado en el grupo de origen */
+  let S  = [pS1 * N, pS2 * N, pS3 * N];
+  let I  = [0, 0, 0];
+  let Ra = [0, 0, 0];
+  let Rb = [0, 0, 0];
+
+  if (activeScenario === 'I1')      { I = [1, 0, 0]; S[0] -= 1; }
+  else if (activeScenario === 'I2') { I = [0, 1, 0]; S[1] -= 1; }
+  else                              { I = [0, 0, 1]; S[2] -= 1; }
+
+  /* Matriz β y gammas: se calculan una vez fuera del bucle.
+     Solo m7 actúa dentro del bucle porque su efecto depende
+     del estado dinámico del sistema (R_total en cada paso). */
+  const B_static = makeBeta(C, mitigations);
+  const gammas   = getGammas(mitigations);
+
+  /* Estructura de almacenamiento de series temporales */
+  const series = {
+    S1:[], S2:[], S3:[], I1:[], I2:[], I3:[],
+    ST:[], IT:[], RaT:[], RbT:[], RT:[],
+    Ra:[], Rb:[], Ra1:[], Ra2:[], Ra3:[], Rb1:[], Rb2:[], Rb3:[],
+    days:[]
+  };
+
+  /* ── Bucle de integración (método de Euler explícito) ── */
+  for (let t = 0; t < steps; t++) {
+
+    /* Factor multiplicativo sobre β para m7.
+       m7 actúa en cada paso porque su efecto depende del estado
+       actual del sistema: a medida que crece R_total (más personas
+       que ya reconocen la noticia como falsa), la presión de denuncia
+       aumenta y β cae más, hasta un mínimo del 10%.
+       Respaldo: Franco (2020, fSIR) — mecanismo de retroalimentación
+       negativa; κ=0.3 es parámetro de calibración, no valor empírico.
+       Bak-Coleman et al. (2022, Nature Human Behaviour) — reducciones
+       dinámicas de viralidad pueden reducir la propagación hasta un 45%. */
+    let betaFactor = 1;
+    if (mitigations.m7) {
+      const Rtotal = Ra[0] + Ra[1] + Ra[2] + Rb[0] + Rb[1] + Rb[2];
+      const dynamicFactor = Math.max(0.1, 1 - 0.3 * (Rtotal / N));
+      betaFactor *= dynamicFactor;
+    }
+
+    /* Aplicar betaFactor a la copia estática de B */
+    const B = B_static.map(row => row.map(v => v * betaFactor));
+
+    /* Fuerza de infección λₖ para cada grupo susceptible k:
+         λₖ = Σᵢ β_ij · Iᵢ / N
+       Suma las contribuciones de los tres tipos de infectados. */
+    const lambda = [0, 1, 2].map(k =>
+      [0, 1, 2].reduce((s, i) => s + B[i][k] * I[i] / N, 0)
+    );
+
+    /* Flujos en este paso dt */
+    const newI  = [0, 1, 2].map(k => S[k] * lambda[k] * dt); // S → I
+    const recov = [0, 1, 2].map(k => gammas[k] * I[k] * dt); // I → R
+
+    /* Actualización de compartimentos (Euler explícito).
+       Math.max(0, ...) evita valores negativos por error numérico. */
+    S  = S.map((v, k)  => Math.max(0, v - newI[k]));
+    I  = I.map((v, k)  => Math.max(0, v + newI[k] - recov[k]));
+    Ra = Ra.map((v, k) => v + pk[k]       * recov[k]); // fracción permanente
+    Rb = Rb.map((v, k) => v + (1 - pk[k]) * recov[k]); // fracción temporal
+    /* Nota: δ=0 → no hay flujo Rb → S durante el horizonte de 90 días. */
+
+    /* Guardar un punto de cada dos pasos (submuestreo ×2).
+       La gráfica queda con 90 puntos (uno por día entero). */
+    if (t % 2 === 0) {
+      series.days.push(t * dt);
+      series.S1.push(Math.round(S[0]));
+      series.S2.push(Math.round(S[1]));
+      series.S3.push(Math.round(S[2]));
+      series.I1.push(Math.round(I[0]));
+      series.I2.push(Math.round(I[1]));
+      series.I3.push(Math.round(I[2]));
+      series.ST.push(Math.round(S[0] + S[1] + S[2]));
+      series.IT.push(Math.round(I[0] + I[1] + I[2]));
+      series.Ra1.push(Math.round(Ra[0]));
+      series.Ra2.push(Math.round(Ra[1]));
+      series.Ra3.push(Math.round(Ra[2]));
+      series.Rb1.push(Math.round(Rb[0]));
+      series.Rb2.push(Math.round(Rb[1]));
+      series.Rb3.push(Math.round(Rb[2]));
+      series.Ra.push(Math.round(Ra[0] + Ra[1] + Ra[2]));
+      series.Rb.push(Math.round(Rb[0] + Rb[1] + Rb[2]));
+      series.RaT.push(Math.round(Ra[0] + Ra[1] + Ra[2]));
+      series.RbT.push(Math.round(Rb[0] + Rb[1] + Rb[2]));
+      series.RT.push(Math.round(Ra[0] + Ra[1] + Ra[2] + Rb[0] + Rb[1] + Rb[2]));
+    }
+  }
+  return series;
+}
+
+
+/* ================================================================
+   toggleCurve(key)
+   Añade o elimina una curva del Set activeCurves y actualiza
+   el estilo visual del botón correspondiente.
+================================================================ */
+function toggleCurve(key) {
+  if (activeCurves.has(key)) {
+    activeCurves.delete(key);
+  } else {
+    activeCurves.add(key);
+  }
+  /* Sincronizar estilos de todos los botones de curva */
+  document.querySelectorAll('.cbtn').forEach(btn => {
+    const k = btn.dataset.curve;
+    if (activeCurves.has(k)) {
+      btn.style.background  = btn.style.getPropertyValue('--active-bg');
+      btn.style.borderColor = btn.style.getPropertyValue('--active-border');
+      btn.style.color       = btn.style.getPropertyValue('--active-color');
+    } else {
+      btn.style.background  = '';
+      btn.style.borderColor = '';
+      btn.style.color       = '';
+    }
+  });
+  update();
+}
+
+
+/* ================================================================
+   setScenario(scenario)
+   Cambia el escenario de origen del brote y marca el botón activo.
+================================================================ */
+function setScenario(scenario) {
+  activeScenario = scenario;
+  document.querySelectorAll('.sbtn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.scenario === scenario);
+  });
+  update();
+}
+
+
+/* ================================================================
+   getMitigations()
+   Lee el estado de los siete checkboxes y retorna un objeto
+   con booleanos {m1..m7}.
+================================================================ */
+function getMitigations() {
+  return {
+    m1: document.getElementById('m1').checked,
+    m2: document.getElementById('m2').checked,
+    m3: document.getElementById('m3').checked,
+    m4: document.getElementById('m4').checked,
+    m5: document.getElementById('m5').checked,
+    m6: document.getElementById('m6').checked,
+    m7: document.getElementById('m7').checked
+  };
+}
+
+
+/* ================================================================
+   onInputSusceptible(moved)
+   Manejador de los sliders de distribución de susceptibles.
+   Garantiza que pS1 + pS2 + pS3 = 100% en todo momento:
+     - S3 es de solo lectura y absorbe siempre el remanente.
+     - Si el slider movido haría que S3 < 0 (pS1 + pS2 > 100),
+       se clampea al máximo permitido y S3 queda en 0.
+
+   Parámetro:
+     moved – 'pS1' o 'pS2', identifica qué slider acaba de moverse.
+================================================================ */
+function onInputSusceptible(moved) {
+  const sliderS1 = document.getElementById('pS1');
+  const sliderS2 = document.getElementById('pS2');
+  const sliderS3 = document.getElementById('pS3');
+
+  let v1 = parseInt(sliderS1.value);
+  let v2 = parseInt(sliderS2.value);
+
+  /* Si la suma supera 100, bloquear el slider que se está moviendo
+     en el valor máximo que deja al menos 0% para S3. */
+  if (v1 + v2 > 100) {
+    if (moved === 'pS1') {
+      v1 = 100 - v2;
+      sliderS1.value = v1;
+    } else {
+      v2 = 100 - v1;
+      sliderS2.value = v2;
+    }
+  }
+
+  /* S3 toma el remanente (siempre ≥ 0) */
+  const v3 = 100 - v1 - v2;
+  sliderS3.value = v3;
+
+  /* Actualizar etiquetas y relanzar la simulación */
+  document.getElementById('pS1-v').textContent = v1 + '%';
+  document.getElementById('pS2-v').textContent = v2 + '%';
+  document.getElementById('pS3-v').textContent = v3 + '%';
+  update();
+}
+
+
+/* Instancia única de Chart.js. Se crea en la primera llamada a
+   update() y se reutiliza en las siguientes. */
+let chart = null;
+
+
+/* ================================================================
+   update()
+   Función principal. Se llama cada vez que el usuario interactúa
+   con cualquier control. Coordina:
+     1. Lectura de parámetros de la interfaz.
+     2. Ejecución de la simulación (una o dos veces).
+     3. Cálculo de métricas resumen.
+     4. Construcción de datasets y actualización de la gráfica.
+================================================================ */
+function update() {
+  /* Leer parámetros actuales */
+  const C   = parseFloat(document.getElementById('C').value);
+  const pS1 = parseFloat(document.getElementById('pS1').value);
+  const pS2 = parseFloat(document.getElementById('pS2').value);
+  const pS3 = parseFloat(document.getElementById('pS3').value); // calculado por onInputSusceptible
+  const N   = parseFloat(document.getElementById('N').value);
+
+  /* Actualizar etiquetas de valor de los sliders */
+  document.getElementById('C-v').textContent   = C;
+  document.getElementById('g1-v').textContent  = parseFloat(document.getElementById('g1').value).toFixed(2);
+  document.getElementById('g2-v').textContent  = parseFloat(document.getElementById('g2').value).toFixed(2);
+  document.getElementById('g3-v').textContent  = parseFloat(document.getElementById('g3').value).toFixed(2);
+  document.getElementById('pS1-v').textContent = pS1 + '%';
+  document.getElementById('pS2-v').textContent = pS2 + '%';
+  document.getElementById('pS3-v').textContent = pS3 + '%';
+  document.getElementById('N-v').textContent   = N >= 1000000 ? (N / 1000000).toFixed(1) + 'M' : (N / 1000).toFixed(0) + 'k';
+
+  const mit = getMitigations();
+  const hasMitigation = Object.values(mit).some(Boolean);
+
+  /* Si hay mitigaciones activas, simular también sin ellas para
+     mostrar la línea de referencia discontinua en la gráfica. */
+  const noMitigation = { m1:false, m2:false, m3:false, m4:false, m5:false, m6:false, m7:false };
+  const baseSeries   = hasMitigation ? simulate(C, noMitigation, pS1, pS2, pS3, N) : null;
+  const series       = simulate(C, mit, pS1, pS2, pS3, N);
+  const labels       = series.days.map(d => Math.round(d));
+
+  /* ── Cálculo de métricas resumen ── */
+
+  /* Infectados totales en cada instante (suma de los tres grupos) */
+  const totalI = series.I1.map((v, i) => v + series.I2[i] + series.I3[i]);
+
+  /* Pico: valor máximo de infectados totales y el día en que ocurre */
+  const peak    = Math.max(...totalI);
+  const peakIdx = totalI.indexOf(peak);
+  const peakDay = Math.round(series.days[peakIdx]);
+
+  /* Extinción: primer día después del pico en que I_total cae por debajo
+     del umbral (0.1% de N, mínimo 100 personas).
+     La búsqueda empieza desde el pico para evitar falsos positivos
+     en el período inicial antes de que arranque el brote. */
+  const threshold = Math.max(100, N * 0.001);
+  let extinctDay  = '> 90';
+  for (let i = peakIdx; i < totalI.length; i++) {
+    if (totalI[i] < threshold) { extinctDay = Math.round(series.days[i]); break; }
+  }
+
+  /* Alcance final: total de recuperados el último día, como % de N */
+  const finalReach = series.RT[series.RT.length - 1];
+  const pct = (finalReach / N) * 100;
+
+  /* Inyectar métricas en el DOM */
+  document.getElementById('m-peak').textContent     = peak >= 1000 ? (peak / 1000).toFixed(1) + 'k' : Math.round(peak);
+  document.getElementById('m-peak-day').textContent = 'día ' + peakDay;
+  document.getElementById('m-final').textContent    = Math.max(0, Math.round(pct)) + '%';
+  document.getElementById('m-extinct').textContent  = extinctDay;
+
+  /* ── Construcción de datasets para Chart.js ── */
+  const activeKeys = ALL_CURVES.filter(k => activeCurves.has(k));
+  const datasets   = [];
+
+  activeKeys.forEach(k => {
+    /* Si hay mitigaciones, añadir primero la serie base en línea discontinua */
+    if (hasMitigation && baseSeries) {
+      datasets.push({
+        label:           `${CURVE_META[k].label} (sin mitigación)`,
+        data:            baseSeries[k],
+        borderColor:     CURVE_META[k].color,
+        backgroundColor: 'transparent',
+        borderWidth:     2,
+        borderDash:      [7, 5], // patrón de guion para la línea de referencia
+        pointRadius:     0,
+        tension:         0.3,
+      });
+    }
+    /* Serie con mitigaciones activas (línea continua) */
+    datasets.push({
+      label:           CURVE_META[k].label,
+      data:            series[k],
+      borderColor:     CURVE_META[k].color,
+      backgroundColor: 'transparent',
+      borderWidth:     2.3,
+      pointRadius:     0,
+      tension:         0.3,
+    });
+  });
+
+  /* ── Leyenda personalizada (la nativa de Chart.js está desactivada) ── */
+  const legendItems = ALL_CURVES
+    .filter(k => activeCurves.has(k))
+    .map(k => ({ color: CURVE_META[k].color, label: CURVE_META[k].label }));
+  document.getElementById('legend').innerHTML = legendItems.map(it =>
+    `<span class="leg-item"><span class="leg-dot" style="background:${it.color}"></span>${it.label}</span>`
+  ).join('');
+
+  /* ── Crear o actualizar la instancia de Chart.js ── */
+  if (!chart) {
+    /* Primera llamada: crear el objeto Chart con su configuración completa */
+    chart = new Chart(document.getElementById('chart'), {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 250 },
+        interaction: { mode: 'index', intersect: false }, // tooltip vertical
+        plugins: {
+          legend: { display: false }, // se usa la leyenda personalizada
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('es-ES')}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'días', font: { size: 15, weight: '600' }, color: '#a899c4' },
+            ticks: { color: '#a899c4', font: { size: 11 }, maxTicksLimit: 10 },
+            grid:  { color: 'rgba(108,79,214,0.07)' },
+            border:{ color: 'rgba(108,79,214,0.10)' }
+          },
+          y: {
+            title: { display: true, text: 'personas', font: { size: 15, weight: '600' }, color: '#a899c4' },
+            ticks: {
+              color: '#a899c4', font: { size: 11 },
+              callback: v => v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v // abreviar miles
+            },
+            grid:  { color: 'rgba(108,79,214,0.07)' },
+            border:{ color: 'rgba(108,79,214,0.10)' }
+          }
+        }
+      }
+    });
+  } else {
+    /* Llamadas sucesivas: reemplazar datos y redibujar sin recrear el canvas */
+    chart.data.labels   = labels;
+    chart.data.datasets = datasets;
+    chart.update();
+  }
+}
+
+
+/* ================================================================
+   INICIALIZACIÓN
+   Al cargar la página: marcar visualmente las curvas activas por
+   defecto (I1, I2, I3) y ejecutar la primera simulación.
+================================================================ */
+document.querySelectorAll('.cbtn').forEach(btn => {
+  const k = btn.dataset.curve;
+  if (activeCurves.has(k)) {
+    btn.style.background  = btn.style.getPropertyValue('--active-bg');
+    btn.style.borderColor = btn.style.getPropertyValue('--active-border');
+    btn.style.color       = btn.style.getPropertyValue('--active-color');
+  }
+});
+
+update();
+
+
+/* ================================================================
+   COMPARADOR DE DOS PUNTOS
+   Estado del modo comparación y los dos puntos seleccionados.
+================================================================ */
+let compareMode   = false; // true cuando el modo comparación está activo
+let comparePoints = [];    // array de 0, 1 o 2 puntos capturados {day, values}
+
+
+/* ================================================================
+   toggleCompareMode()
+   Activa o desactiva el modo comparación.
+   - Al activarlo: limpia los puntos anteriores, cambia el texto
+     del botón, muestra la instrucción y pone el cursor en cruz.
+   - Al desactivarlo: restaura el botón y oculta el panel.
+================================================================ */
+function toggleCompareMode() {
+  compareMode = !compareMode;
+  const btn   = document.getElementById('compare-btn');
+  const hint  = document.getElementById('compare-hint');
+  const panel = document.getElementById('compare-panel');
+
+  if (compareMode) {
+    comparePoints       = [];
+    btn.textContent     = 'Cancelar comparación';
+    btn.classList.add('compare-active');
+    hint.textContent    = 'Haz clic en la gráfica para seleccionar el punto 1';
+    panel.style.display = 'none';
+    panel.innerHTML     = '';
+    document.getElementById('chart').style.cursor = 'crosshair';
+  } else {
+    btn.textContent = 'Comparar dos puntos';
+    btn.classList.remove('compare-active');
+    hint.textContent = '';
+    document.getElementById('chart').style.cursor = '';
+  }
+}
+
+
+/* ================================================================
+   Listener de clic sobre el canvas de la gráfica.
+   Solo actúa si el modo comparación está activo.
+
+   Usa Chart.js getElementsAtEventForMode con mode 'index' para
+   identificar el índice del punto más cercano en el eje X,
+   igual que el tooltip nativo. Recoge el día y los valores de
+   todas las curvas activas en ese índice.
+
+   Primer clic  → registra el punto 1 y pide el punto 2.
+   Segundo clic → registra el punto 2, sale del modo comparación
+                  y llama a renderComparePanel().
+================================================================ */
+document.getElementById('chart').addEventListener('click', function(e) {
+  if (!compareMode || !chart) return;
+
+  /* Obtener el índice del punto más cercano en el eje X */
+  const points = chart.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+  if (!points.length) return;
+  const idx = points[0].index;
+
+  /* Recoger el día y todos los datasets visibles en ese índice,
+     en el mismo orden en que aparecen en chart.data.datasets.
+     Esto incluye tanto las líneas continuas (con mitigación) como
+     las discontinuas (sin mitigación), igual que el tooltip. */
+  const day      = chart.data.labels[idx];
+  const snapshot = chart.data.datasets.map(ds => ({
+    label: ds.label,
+    color: ds.borderColor,
+    value: ds.data[idx],
+    dashed: Array.isArray(ds.borderDash) && ds.borderDash.length > 0,
+  }));
+
+  comparePoints.push({ day, snapshot });
+
+  const hint = document.getElementById('compare-hint');
+
+  if (comparePoints.length === 1) {
+    /* Primer punto registrado: solicitar el segundo */
+    hint.textContent = `Punto 1 seleccionado (día ${day}). Ahora haz clic para seleccionar el punto 2`;
+
+  } else if (comparePoints.length === 2) {
+    /* Segundo punto registrado: salir del modo y mostrar resultados */
+    hint.textContent = '';
+    compareMode      = false;
+    document.getElementById('compare-btn').textContent = 'Comparar dos puntos';
+    document.getElementById('compare-btn').classList.remove('compare-active');
+    document.getElementById('chart').style.cursor = '';
+    renderComparePanel();
+  }
+});
+
+
+/* ================================================================
+   renderComparePanel()
+   Construye y muestra las dos tarjetas con los datos de cada punto.
+   Replica exactamente el contenido del tooltip de Chart.js:
+   el mismo orden de datasets, el mismo color de punto, la misma
+   etiqueta y el valor numérico formateado con separador de miles.
+   Si hay mitigaciones activas, aparecen también las filas
+   "(sin mitigación)" con el icono de línea discontinua, igual
+   que en el tooltip.
+================================================================ */
+function renderComparePanel() {
+  const panel = document.getElementById('compare-panel');
+  const [p1, p2] = comparePoints;
+
+  /* Construye el HTML de una tarjeta dado un punto y su etiqueta.
+     Itera sobre el snapshot capturado en el momento del clic,
+     que ya contiene todos los datasets en el orden correcto. */
+  function buildCard(point, label) {
+    const rows = point.snapshot.map(ds => {
+      const val = ds.value !== undefined && ds.value !== null
+        ? Number(ds.value).toLocaleString('es-ES')
+        : '—';
+
+      /* Las líneas discontinuas (sin mitigación) usan un icono de guion
+         en lugar del círculo sólido, para distinguirlas visualmente. */
+      const dotHtml = ds.dashed
+        ? `<span class="cmp-dash" style="background:${ds.color}"></span>`
+        : `<span class="cmp-dot"  style="background:${ds.color}"></span>`;
+
+      return `<div class="cmp-row">
+        ${dotHtml}
+        <span class="cmp-label">${ds.label}</span>
+        <span class="cmp-val">${val}</span>
+      </div>`;
+    }).join('');
+
+    return `<div class="cmp-card">
+      <p class="cmp-title">${label} &mdash; día ${point.day}</p>
+      ${rows}
+    </div>`;
+  }
+
+  panel.innerHTML     = buildCard(p1, 'Punto 1') + buildCard(p2, 'Punto 2');
+  panel.style.display = 'flex';
+}
+</script>
+</body>
+</html>
