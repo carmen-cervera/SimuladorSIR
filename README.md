@@ -3,7 +3,7 @@
 Simulador interactivo del modelo SIR heterogéneo de propagación de *fake news* desarrollado como material complementario del Trabajo de Fin de Grado:
 
 > **"Desarrollo y validación de un modelo matemático para la propagación de bulos en redes sociales basado en analogías epidemiológicas SIR"**
-> Carmen Cervera — ETSIT-UPM, curso 2025/2026
+> Carmen Cervera - ETSIT-UPM, curso 2025/2026
 
 ---
 
@@ -25,9 +25,9 @@ El modelo divide la población en 12 compartimentos organizados en tres perfiles
 
 | Grupo | Susceptibles | Infectados | Recuperados permanentes | Recuperados temporales |
 |-------|-------------|-----------|------------------------|------------------------|
-| Grupo 1 | S1 (baja susceptibilidad) | I1 — Propagadores | Ra1 | Rb1 |
-| Grupo 2 | S2 (susceptibilidad media) | I2 — Amplificadores | Ra2 | Rb2 |
-| Grupo 3 | S3 (alta susceptibilidad) | I3 — Catalizadores | Ra3 | Rb3 |
+| Grupo 1 | S1 (baja susceptibilidad) | I1 - Propagadores | Ra1 | Rb1 |
+| Grupo 2 | S2 (susceptibilidad media) | I2 - Amplificadores | Ra2 | Rb2 |
+| Grupo 3 | S3 (alta susceptibilidad) | I3 - Catalizadores | Ra3 | Rb3 |
 
 La transmisión entre grupos está gobernada por una matriz β de dimensión 3×3, calculada mediante la fórmula:
 
@@ -72,13 +72,13 @@ El simulador incluye siete técnicas de mitigación activables de forma independ
 
 | Técnica | Actor | Efecto en el modelo |
 |---------|-------|---------------------|
-| M1 — Suspensión/*shadowban* de I3 | Plataforma | Cuadruplica γ₃ (techo 0,9) |
-| M2 — Reducción alcance algorítmico de I2 | Plataforma | Multiplica γ₂ × 1,5 (techo 0,8) |
-| M3 — Etiquetado de contenido disputado | Plataforma | Multiplica todos los γ × 1,3; reduce β para receptores S2 |
-| M4 — Fricción al compartir (global) | Plataforma | Multiplica todos los γ × 1,1; reduce β global |
-| M5 — Campaña de alfabetización digital S3 | Institución | Transfiere flujo S1 → S3; reduce β para receptores S1 |
-| M6 — Corrección entre pares | Usuarios | Multiplica todos los γ × 1,2; reduce transición S → I |
-| M7 — Denuncia de contenido falso | Usuarios + plataforma | Multiplica todos los γ × 1,15; reduce β tras umbral con retardo temporal |
+| M1 - Suspensión/*shadowban* de I3 | Plataforma | Cuadruplica γ₃ (techo 0,9) |
+| M2 - Reducción alcance algorítmico de I2 | Plataforma | Multiplica γ₂ × 1,5 (techo 0,8) |
+| M3 - Etiquetado de contenido disputado | Plataforma | Multiplica todos los γ × 1,3; reduce β para receptores S2 |
+| M4 - Fricción al compartir (global) | Plataforma | Multiplica todos los γ × 1,1; reduce β global |
+| M5 - Campaña de alfabetización digital S3 | Institución | Transfiere flujo S1 → S3; reduce β para receptores S1 |
+| M6 - Corrección entre pares | Usuarios | Multiplica todos los γ × 1,2; reduce transición S → I |
+| M7 - Denuncia de contenido falso | Usuarios + plataforma | Multiplica todos los γ × 1,15; reduce β tras umbral con retardo temporal |
 
 Cuando una o más mitigaciones están activas, la gráfica muestra simultáneamente las curvas **con mitigación** (línea continua) y **sin mitigación** (línea discontinua), facilitando la comparación visual del efecto.
 
